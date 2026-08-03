@@ -178,13 +178,13 @@
 const API='https://script.google.com/macros/s/AKfycbwdIvso4Pvx9xcF5nGzKvUrZfuQgBgLqdOkazDVdJ73DCDgLApl35niDTgdMxOwOsbk/exec';
 const SM={
   'producao':{l:'Em produção',c:'b-producao',s:0},'em producao':{l:'Em produção',c:'b-producao',s:0},
-  'pronto':{l:'Pedido pronto',c:'b-pronto',s:1},
-  'agendado':{l:'Agendado',c:'b-agendado',s:2},
+  'pronto':{l:'Pedido pronto',c:'b-pronto',s:2},
+  'agendado':{l:'Agendado',c:'b-agendado',s:1},
   'em transito':{l:'Em trânsito',c:'b-transito',s:3},'em_transito':{l:'Em trânsito',c:'b-transito',s:3},'saida em rota':{l:'Em trânsito',c:'b-transito',s:3},
   'entregue':{l:'Entregue',c:'b-entregue',s:4},'estregue':{l:'Entregue',c:'b-entregue',s:4},'entregado':{l:'Entregue',c:'b-entregue',s:4},
 };
-const SL=['Processo de\nProdução','Pedido\nPronto','Agendamento\nde Entrega','Saída em\nRota','Entregue'];
-const SI=['⚙️','📦','📅','🚚','✅'];
+const SL=['Processo de\nProdução','Agendamento\nde Entrega','Pedido\nPronto','Saída em\nRota','Entregue'];
+const SI=['⚙️','📅','📦','🚚','✅'];
 const n=s=>s.toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\r/g,'');
 function showL(id){['vInicio','vLoad','vErro','vSteps'].forEach(v=>document.getElementById(v).style.display=v===id?'':'none');}
 function voltar(){showL('vInicio');document.getElementById('statusBar').style.display='none';document.getElementById('sideVazio').style.display='';document.getElementById('sideDetalhe').style.display='none';document.getElementById('trackInput').value='';}

@@ -1,5 +1,5 @@
-const CACHE = 'rastreio-v1';
-const ASSETS = ['./rastreamento.html', './manifest.json', './icon-192.png', './icon-512.png'];
+const CACHE = 'rastreio-v2';
+const ASSETS = ['./rastreamento.html', './logo.jpg', './caminhao.png', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));

@@ -38,6 +38,7 @@
     .b-pronto{background:#1e3a5a;color:#7fb8f0;border:1px solid #2a5a8a;}
     .b-agendado{background:#2a1a4a;color:#c8a0f8;border:1px solid #4a2a8a;}
     .b-default{background:#333;color:#aaa;}
+    .b-cancelado{background:#7a1f1f;color:#fff;}
     .body-wrap{display:flex;min-height:calc(100vh - 200px);}
     .main-col{flex:1;padding:26px 24px;min-width:0;}
     .side-col{width:250px;background:#111;border-left:1px solid #2a2a2a;padding:22px 18px;display:flex;flex-direction:column;}
@@ -250,6 +251,9 @@ const SM = {
   'PRONTO':     {l:'Pedido pronto', c:'b-pronto',   s:2},
   'EM TRANSITO':{l:'Em trânsito',   c:'b-transito', s:3},
   'ENTREGUE':   {l:'Entregue',      c:'b-entregue', s:4},
+  // Cancelado não é etapa: o pedido para onde estava. O "s:-1" deixa o
+  // caminhão na última etapa cumprida, sem acender nada à frente.
+  'CANCELADO':  {l:'Cancelado',     c:'b-cancelado', s:-1},
 };
 const statusInfo = st => SM[st] || {l:'—', c:'b-default', s:-1};
 
@@ -279,6 +283,16 @@ function fmtData(s){
   return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
 }
 // Só abre endereço https: um link gravado errado nunca vira código na página.
+// A consulta devolve os anexos públicos em ordem de envio.
+function listaDeAnexos(p){
+  const bruto = Array.isArray(p.anexos) ? p.anexos : [];
+  return bruto.map(a => {
+    const url = tem(a.arquivo) ? URL_NF + a.arquivo.split('/').map(encodeURIComponent).join('/')
+              : (tem(a.link) && /^https:\/\//i.test(a.link.trim()) ? a.link.trim() : '');
+    return url ? {nome: a.nome, url} : null;
+  }).filter(Boolean);
+}
+
 function linkNF(p){
   if (tem(p.nf_arquivo)) return URL_NF + p.nf_arquivo.split('/').map(encodeURIComponent).join('/');
   if (tem(p.nf_link) && /^https:\/\//i.test(p.nf_link.trim())) return p.nf_link.trim();
@@ -408,7 +422,18 @@ function cartao(label, valor, opts){
   const card = el('div', 'info-card' + (opts.accent ? ' accent' : '') + (opts.largo ? ' largo' : ''));
   card.appendChild(el('div', 'ic-label', label));
   const val = el('div', 'ic-value' + (opts.accent ? ' orange' : ''), valor);
-  if (opts.link) {
+  if (opts.links && opts.links.length) {
+    // Um botão por anexo, com o nome que o operador digitou (NF39027,
+    // CRM39027). O valor do cartão só aparece se tiver texto.
+    const wrap = el('div', 'nf-wrap');
+    if (tem(valor)) wrap.appendChild(val);
+    opts.links.forEach(x => {
+      const a = el('a', 'btn-nf', '📄 ' + x.nome);
+      a.href = x.url; a.target = '_blank'; a.rel = 'noopener';
+      wrap.appendChild(a);
+    });
+    card.appendChild(wrap);
+  } else if (opts.link) {
     const wrap = el('div', 'nf-wrap');
     wrap.appendChild(val);
     const a = el('a', 'btn-nf', '📄 Abrir NF');
@@ -441,10 +466,17 @@ function renderDetalhe(p){
 
   // Etapa concluída = até a etapa atual, como sempre foi. A data aparece
   // embaixo só nas etapas que foram de fato marcadas no cadastro.
+  // Cancelado não é etapa, então o status não diz até onde o pedido foi.
+  // Nesse caso o avanço vem das datas: o que aconteceu continua marcado,
+  // e nada acende daí para a frente.
+  const foiCancelado = tem(p.cancelado_em);
+  const passo = si.s >= 0 ? si.s
+    : ETAPAS.reduce((ult, et, i) => tem(p[et.col]) ? i : ult, -1);
+
   const sr = $('stepsRow'); sr.innerHTML = '';
   ETAPAS.forEach((et, i) => {
-    const done = i <= si.s;
-    const d = el('div', 'st' + (done ? ' done' : '') + (i === si.s && si.s < 4 ? ' atual' : ''));
+    const done = i <= passo;
+    const d = el('div', 'st' + (done ? ' done' : '') + (i === passo && passo < 4 && !foiCancelado ? ' atual' : ''));
     d.appendChild(el('div', 'st-box', done ? '✓' : et.icon));
     const lbl = el('div', 'st-lbl');
     et.lbl.forEach((linha, k) => { if (k) lbl.appendChild(document.createElement('br')); lbl.appendChild(document.createTextNode(linha)); });
@@ -457,11 +489,16 @@ function renderDetalhe(p){
   if (tem(p.localizacao))  ge.appendChild(cartao('Localização Atual', p.localizacao, {accent:true}));
   if (tem(p.previsao))     ge.appendChild(cartao('Previsão de Chegada', fmtData(p.previsao)));
   if (tem(p.recebido_por)) ge.appendChild(cartao('Recebido por', p.recebido_por));
-  // O cartão aparece se houver número OU PDF: NF anexada sem número digitado
-  // não pode ficar escondida do cliente.
-  const nfLink = linkNF(p);
-  if (tem(p.nota_fiscal) || nfLink)
-    ge.appendChild(cartao('Nota Fiscal', tem(p.nota_fiscal) ? p.nota_fiscal : 'PDF anexado', {link: nfLink}));
+  // Anexos: um botão para cada, com o nome digitado no ADM. Pedidos
+  // antigos, de antes da lista, caem no arquivo único de sempre.
+  const anexos = listaDeAnexos(p);
+  if (anexos.length) {
+    ge.appendChild(cartao('Documentos', tem(p.nota_fiscal) ? 'NF ' + p.nota_fiscal : '', {links: anexos, largo:true}));
+  } else {
+    const nfLink = linkNF(p);
+    if (tem(p.nota_fiscal) || nfLink)
+      ge.appendChild(cartao('Nota Fiscal', tem(p.nota_fiscal) ? p.nota_fiscal : 'PDF anexado', {link: nfLink}));
+  }
 
   const gt = $('gridTransp'); gt.innerHTML = '';
   if (tem(p.transportadora)) gt.appendChild(cartao('Transportadora', p.transportadora));
@@ -470,7 +507,7 @@ function renderDetalhe(p){
   $('secTransp').style.display = gt.children.length ? '' : 'none';
 
   showL('vSteps');
-  moverCaminhao(Math.max(0, si.s));
+  moverCaminhao(Math.max(0, passo));
 
   campoLateral('sfCliente', 'svCliente', p.cliente);
   campoLateral('sfDesc', 'svDesc', p.descricao);
@@ -479,9 +516,19 @@ function renderDetalhe(p){
 
   // Histórico: da etapa mais avançada para a primeira.
   const svHist = $('svHist'); svHist.innerHTML = '';
+  if (tem(p.cancelado_em)) {
+    const item = el('div', 'tl-item');
+    item.appendChild(el('div', 'tl-dot'));
+    const txt = el('div');
+    txt.appendChild(el('div', 'tl-text', 'Pedido cancelado'));
+    txt.appendChild(el('div', 'tl-time', fmtDH(p.cancelado_em)));
+    item.appendChild(txt);
+    svHist.appendChild(item);
+  }
+  const cancelado = tem(p.cancelado_em);
   ETAPAS.slice().reverse().filter(et => p[et.col]).forEach((et, i) => {
     const item = el('div', 'tl-item');
-    item.appendChild(el('div', 'tl-dot' + (i > 0 ? ' old' : '')));
+    item.appendChild(el('div', 'tl-dot' + (i > 0 || cancelado ? ' old' : '')));
     const txt = el('div');
     txt.appendChild(el('div', 'tl-text', et.hist));
     txt.appendChild(el('div', 'tl-time', fmtDH(p[et.col])));

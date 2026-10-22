@@ -1,4 +1,4 @@
-const CACHE = 'rastreio-v2';
+const CACHE = 'rastreio-v3';
 const ASSETS = ['./rastreamento.html', './logo.jpg', './caminhao.png', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

@@ -493,7 +493,8 @@ function renderDetalhe(p){
   // antigos, de antes da lista, caem no arquivo único de sempre.
   const anexos = listaDeAnexos(p);
   if (anexos.length) {
-    ge.appendChild(cartao('Documentos', tem(p.nota_fiscal) ? 'NF ' + p.nota_fiscal : '', {links: anexos, largo:true}));
+    ge.appendChild(cartao(anexos.length > 1 ? 'Documentos' : 'Documento',
+      tem(p.nota_fiscal) ? 'NF ' + p.nota_fiscal : '', {links: anexos, largo:true}));
   } else {
     const nfLink = linkNF(p);
     if (tem(p.nota_fiscal) || nfLink)

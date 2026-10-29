@@ -368,7 +368,8 @@ function mostrarLista(){
     info.appendChild(el('div', 'ent-tit', tem(p.cliente) ? p.cliente : 'Entrega ' + (i + 1)));
     const sub = [];
     if (tem(p.descricao)) sub.push(p.descricao);
-    if (tem(p.nota_fiscal) && p.nota_fiscal.length <= 12) sub.push('NF ' + p.nota_fiscal);
+    // sem rótulo "NF": o documento tanto pode ser uma nota quanto um CRM
+    if (tem(p.nota_fiscal) && p.nota_fiscal.length <= 12) sub.push(p.nota_fiscal);
     if (tem(p.previsao)) sub.push('Previsão ' + fmtData(p.previsao));
     if (sub.length) info.appendChild(el('div', 'ent-sub', sub.join(' · ')));
     card.appendChild(info);
@@ -494,7 +495,7 @@ function renderDetalhe(p){
   const anexos = listaDeAnexos(p);
   if (anexos.length) {
     ge.appendChild(cartao(anexos.length > 1 ? 'Documentos' : 'Documento',
-      tem(p.nota_fiscal) ? 'NF ' + p.nota_fiscal : '', {links: anexos, largo:true}));
+      tem(p.nota_fiscal) ? p.nota_fiscal : '', {links: anexos, largo:true}));
   } else {
     const nfLink = linkNF(p);
     if (tem(p.nota_fiscal) || nfLink)

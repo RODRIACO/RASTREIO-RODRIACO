@@ -142,7 +142,7 @@
       <div class="hero-h1">Rastreamento de <span>Pedido</span></div>
       <div class="hero-sub">Acompanhe sua entrega em tempo real</div>
       <div class="search-wrap">
-        <input type="text" id="trackInput" placeholder="Digite o número do pedido..." autocomplete="off"/>
+        <input type="text" id="trackInput" placeholder="Número do pedido ou CRM..." autocomplete="off"/>
         <button id="btnBuscar" onclick="buscar()">Rastrear</button>
       </div>
     </div>
@@ -200,7 +200,7 @@
       <div id="sideDetalhe" style="display:none;flex-direction:column;flex:1;">
         <div class="side-title">Detalhes da Carga</div>
         <div class="s-field" id="sfCliente" style="display:none;"><div class="s-flabel">Cliente</div><div class="s-fvalue" id="svCliente"></div></div>
-        <div class="s-field" id="sfDesc" style="display:none;"><div class="s-flabel">Descrição</div><div class="s-fvalue" id="svDesc"></div></div>
+        <div class="s-field" id="sfDesc" style="display:none;"><div class="s-flabel">CRM</div><div class="s-fvalue" id="svDesc"></div></div>
         <div id="sfObs" style="display:none;">
           <div class="side-title" style="margin-top:16px;">Observações</div>
           <div class="s-field"><div class="s-fvalue" id="svObs"></div></div>
@@ -261,6 +261,11 @@ let entregas = [];
 
 const $ = id => document.getElementById(id);
 const tem = v => v != null && String(v).trim() !== '' && String(v).trim() !== '0';
+
+// A descrição guarda a CRM, e em muitos cadastros o prefixo veio escrito
+// junto ("CRM: 38858"). Na tela o rótulo já diz CRM, então o prefixo sai -
+// o que está gravado no banco continua igual.
+const soCRM = v => tem(v) ? String(v).replace(/^\s*CRM\s*[:\-–]?\s*/i, '').trim() : '';
 function el(tag, cls, txt){
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -340,7 +345,7 @@ async function buscar(){
     if (!Array.isArray(rows)) throw new Error('Resposta inesperada');
     entregas = rows;
     if (!rows.length) {
-      mostrarErro('Pedido não encontrado', 'Confira o número "' + num + '" e tente novamente.');
+      mostrarErro('Pedido não encontrado', 'Confira o número do pedido ou a CRM "' + num + '" e tente novamente.');
     } else if (rows.length === 1) {
       renderDetalhe(rows[0]);
     } else {
@@ -353,11 +358,19 @@ async function buscar(){
   }
 }
 
+const umPedidoSo = () => entregas.every(e => e.numero === entregas[0].numero);
+
 // A mesma ordem de compra pode sair em várias entregas: o cliente escolhe qual ver.
 function mostrarLista(){
   if (entregas.length < 2) return;
   $('truckWrap').style.display = 'none';
-  $('sbLeft').textContent = 'Pedido Nº ' + entregas[0].numero + ' — ' + entregas.length + ' entregas';
+  // Buscando por CRM, o resultado pode cair em pedidos de números diferentes.
+  // Nesse caso o cabeçalho mostra a CRM, porque não há um número só.
+  const crmBusca = soCRM(entregas[0].descricao);
+  $('sbLeft').textContent = (umPedidoSo()
+      ? 'Pedido Nº ' + entregas[0].numero
+      : (crmBusca ? 'CRM ' + crmBusca : 'Resultado da busca'))
+    + ' — ' + entregas.length + ' entregas';
   const bd = $('sbBadge'); bd.textContent = ''; bd.className = 'badge'; bd.style.display = 'none';
   $('statusBar').style.display = 'flex';
   const box = $('listaEntregas'); box.innerHTML = '';
@@ -367,7 +380,7 @@ function mostrarLista(){
     const info = el('div', 'ent-info');
     info.appendChild(el('div', 'ent-tit', tem(p.cliente) ? p.cliente : 'Entrega ' + (i + 1)));
     const sub = [];
-    if (tem(p.descricao)) sub.push(p.descricao);
+    if (tem(p.descricao)) sub.push(soCRM(p.descricao));
     // sem rótulo "NF": o documento tanto pode ser uma nota quanto um CRM
     if (tem(p.nota_fiscal) && p.nota_fiscal.length <= 12) sub.push(p.nota_fiscal);
     if (tem(p.previsao)) sub.push('Previsão ' + fmtData(p.previsao));
@@ -459,7 +472,8 @@ function renderDetalhe(p){
 
   const btnLista = $('btnLista');
   if (entregas.length > 1) {
-    btnLista.textContent = '← Ver as ' + entregas.length + ' entregas deste pedido';
+    btnLista.textContent = '← Ver as ' + entregas.length +
+      (umPedidoSo() ? ' entregas deste pedido' : ' entregas encontradas');
     btnLista.style.display = 'inline-block';
   } else {
     btnLista.style.display = 'none';
@@ -512,7 +526,7 @@ function renderDetalhe(p){
   moverCaminhao(Math.max(0, passo));
 
   campoLateral('sfCliente', 'svCliente', p.cliente);
-  campoLateral('sfDesc', 'svDesc', p.descricao);
+  campoLateral('sfDesc', 'svDesc', soCRM(p.descricao));
   if (tem(p.observacao)) { $('svObs').textContent = p.observacao; $('sfObs').style.display = ''; }
   else { $('sfObs').style.display = 'none'; }
 
